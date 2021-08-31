@@ -11,8 +11,8 @@ import jieba
 from bert4keras.snippets import open
 
 # 自定义词典
-user_dict_path = '/root/cail2020/sfzyx/datasets/user_dict.txt'
-user_dict_path_2 = '/root/cail2020/sfzyx/datasets/user_dict_2.txt'
+user_dict_path = '/home/transwarp/gujiasheng/SPACES/datasets/user_dict.txt'
+user_dict_path_2 = '/home/transwarp/gujiasheng/SPACES/datasets/user_dict_2.txt'
 jieba.load_userdict(user_dict_path)
 jieba.initialize()
 
@@ -20,24 +20,24 @@ jieba.initialize()
 sys.setrecursionlimit(1000000)
 
 # 标注数据
-data_json = '/root/cail2020/sfzyx/datasets/train.json'
+data_json = '/home/transwarp/gujiasheng/data/sfzy_data/sfzy_small.json'
 
 # 保存权重的文件夹
 if not os.path.exists('weights'):
     os.mkdir('weights')
 
 # bert配置
-config_path = '/root/kg/bert/chinese_roberta_wwm_ext_L-12_H-768_A-12/bert_config.json'
-checkpoint_path = '/root/kg/bert/chinese_roberta_wwm_ext_L-12_H-768_A-12/bert_model.ckpt'
-dict_path = '/root/kg/bert/chinese_roberta_wwm_ext_L-12_H-768_A-12/vocab.txt'
+config_path = '/home/transwarp/gujiasheng/pretrained/chinese_wobert_L-12_H-768_A-12/bert_config.json'
+checkpoint_path = '/home/transwarp/gujiasheng/pretrained/chinese_wobert_L-12_H-768_A-12/bert_model.ckpt'
+dict_path = '/home/transwarp/gujiasheng/pretrained/chinese_wobert_L-12_H-768_A-12/vocab.txt'
 
 # nezha配置
-nezha_config_path = '/root/kg/bert/nezha_base/bert_config.json'
-nezha_checkpoint_path = '/root/kg/bert/nezha_base/model.ckpt-900000'
-nezha_dict_path = '/root/kg/bert/nezha_base/vocab.txt'
 
+nezha_config_path = '/home/transwarp/gujiasheng/pretrained/chinese_wonezha_L-12_H-768_A-12/bert_config.json'
+nezha_checkpoint_path = '/home/transwarp/gujiasheng/pretrained/chinese_wonezha_L-12_H-768_A-12/bert_model.ckpt'
+nezha_dict_path = '/home/transwarp/gujiasheng/pretrained/chinese_wonezha_L-12_H-768_A-12/vocab.txt'
 # 将数据划分N份，一份作为验证集
-num_folds = 15
+num_folds = 5
 
 # 指标名
 metric_keys = ['main', 'rouge-1', 'rouge-2', 'rouge-l']

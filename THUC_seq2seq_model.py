@@ -19,6 +19,7 @@ from keras.layers import Input, Dense, Lambda
 from keras.models import Model
 from snippets import *
 import glob
+from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 
 # 基本参数
 # maxlen = 1024
@@ -101,15 +102,22 @@ def random_masking(token_ids):
         for r, t in zip(rands, token_ids)
     ]
 
+
+
+
+
 class data_generator(DataGenerator):
     """数据生成器
     """
     def __iter__(self, random=False):
         batch_token_ids, batch_segment_ids = [], []
         batch_output_ids, batch_labels = [], []
-        for is_end, d in self.sample(random):
-            i = np.random.choice(2) + 1 if random else 1
-            source, target = d['source_1'], d['target']
+        for is_end, txt in self.sample(random):
+            text = open(txt, encoding='utf-8').read()
+            text = text.split('\n')
+            if len(text) > 1:
+                target = text[0]
+                source = '\n'.join(text[1:])
             token_ids, segment_ids = tokenizer.encode(
                 source, target, maxlen=maxlen, pattern='S*ES*E'
             )
@@ -134,6 +142,40 @@ class data_generator(DataGenerator):
                 ], None
                 batch_token_ids, batch_segment_ids = [], []
                 batch_output_ids, batch_labels = [], []
+
+# class data_generator(DataGenerator):
+#     """数据生成器
+#     """
+#     def __iter__(self, random=False):
+#         batch_token_ids, batch_segment_ids = [], []
+#         batch_output_ids, batch_labels = [], []
+#         for is_end, d in self.sample(random):
+#             # i = np.random.choice(2) + 1 if random else 1
+#             source, target = d['source_1'], d['target']
+#             token_ids, segment_ids = tokenizer.encode(
+#                 source, target, maxlen=maxlen, pattern='S*ES*E'
+#             )
+#             idx = token_ids.index(tokenizer._token_end_id) + 1
+#             masked_token_ids = random_masking(token_ids)
+#             source_labels, target_labels = generate_copy_labels(
+#                 masked_token_ids[:idx], token_ids[idx:]
+#             )
+#             labels = source_labels + target_labels[1:]
+#             batch_token_ids.append(masked_token_ids)
+#             batch_segment_ids.append(segment_ids)
+#             batch_output_ids.append(token_ids)
+#             batch_labels.append(labels)
+#             if len(batch_token_ids) == self.batch_size or is_end:
+#                 batch_token_ids = sequence_padding(batch_token_ids)
+#                 batch_segment_ids = sequence_padding(batch_segment_ids)
+#                 batch_output_ids = sequence_padding(batch_output_ids)
+#                 batch_labels = sequence_padding(batch_labels)
+#                 yield [
+#                     batch_token_ids, batch_segment_ids, \
+#                     batch_output_ids, batch_labels
+#                 ], None
+#                 batch_token_ids, batch_segment_ids = [], []
+#                 batch_output_ids, batch_labels = [], []
 
 class CrossEntropy(Loss):
     """交叉熵作为loss，并mask掉输入部分
@@ -269,7 +311,12 @@ autosummary = AutoSummary(
     maxlen=maxlen // 2
 )
 
-
+def just_show():
+    s1 = u'夏天来临，皮肤在强烈紫外线的照射下，晒伤不可避免，因此，晒后及时修复显得尤为重要，否则可能会造成长期伤害。专家表示，选择晒后护肤品要慎重，芦荟凝胶是最安全，有效的一种选择，晒伤严重者，还请及时就医 。'
+    s2 = u'8月28日，网络爆料称，华住集团旗下连锁酒店用户数据疑似发生泄露。从卖家发布的内容看，数据包含华住旗下汉庭、禧玥、桔子、宜必思等10余个品牌酒店的住客信息。泄露的信息包括华住官网注册资料、酒店入住登记的身份信息及酒店开房记录，住客姓名、手机号、邮箱、身份证号、登录账号密码等。卖家对这个约5亿条数据打包出售。第三方安全平台威胁猎人对信息出售者提供的三万条数据进行验证，认为数据真实性非常高。当天下午 ，华 住集 团发声明称，已在内部迅速开展核查，并第一时间报警。当晚，上海警方消息称，接到华住集团报案，警方已经介入调查。'
+    for s in [s1, s2]:
+        print(u'生成标题:', autosummary.generate(s))
+    print()
 
 
 
@@ -277,44 +324,75 @@ class Evaluator(keras.callbacks.Callback):
     """训练回调
     """
     def __init__(self):
-        self.best_rl= 0.
-    def evaluate(self, data, topk=1, filename=None):
-        """验证集评估
-        """
-        if filename is not None:
-            F = open(filename, 'w', encoding='utf-8')
-        total_metrics = {k: 0.0 for k in metric_keys}
-        for d in tqdm(data, desc=u'评估中'):
-            pred_summary = autosummary.generate(d['source_1'], topk)
-            metrics = compute_metrics(pred_summary, d['target'])
-            for k, v in metrics.items():
-                total_metrics[k] += v
-            if filename is not None:
-                F.write(d['target'] + '\t' + pred_summary + '\n')
-                F.flush()
-        if filename is not None:
-            F.close()
-        return {k: v / len(data) for k, v in total_metrics.items()}
+        self.lowest = 1e10
+        self.rouge = Rouge()
+        self.smooth = SmoothingFunction().method1
+        self.best_bleu = 0.
+
+    def evaluate(self, data, topk=1):
+        total = 0
+        rouge_1, rouge_2, rouge_l, bleu = 0, 0, 0, 0
+        D = []
+        for txt in data:
+            text = open(txt, encoding='utf-8').read()
+            text = text.split('\n')
+            if len(text) > 1:
+                title = text[0]
+                content = '\n'.join(text[1:])
+                D.append((title, content))
+        for title, content in tqdm(D):
+            total += 1
+            title = ' '.join(title).lower()
+            pred_title = ' '.join(autosummary.generate(content, topk)).lower()
+            if pred_title.strip():
+                scores = self.rouge.get_scores(hyps=pred_title, refs=title)
+                rouge_1 += scores[0]['rouge-1']['f']
+                rouge_2 += scores[0]['rouge-2']['f']
+                rouge_l += scores[0]['rouge-l']['f']
+                bleu += sentence_bleu(
+                    references=[title.split(' ')],
+                    hypothesis=pred_title.split(' '),
+                    smoothing_function=self.smooth
+                )
+        rouge_1 /= total
+        rouge_2 /= total
+        rouge_l /= total
+        bleu /= total
+        return {
+            'rouge-1': rouge_1,
+            'rouge-2': rouge_2,
+            'rouge-l': rouge_l,
+            'bleu': bleu,
+        }
     def on_epoch_end(self, epoch, logs=None):
         optimizer.apply_ema_weights()
-        metrics = self.evaluate(valid_data)  # 评测模型
-        if metrics['rouge-l'] > self.best_rl:
-            self.best_rl = metrics['rouge-l']
-            model.save_weights('weights/best_model_csl.weights')  # 保存模型
-        metrics['rouge-l'] = self.best_rl
+        # 保存最优
+        metrics = self.evaluate(valid_data)
+        # if logs['loss'] <= self.lowest:
+        #     self.lowest = logs['loss']
+        #     model.save_weights('./best_model.weights')
+        if metrics['bleu'] > self.best_bleu:
+            self.best_bleu = metrics['bleu']
+            model.save_weights('weights/THUC_best_model.weights')  # 保存模型
+        metrics['best_bleu'] = self.best_bleu
         print('valid_data:', metrics)
+        # 演示效果
+        just_show()
 
-        # model.save_weights('weights/seq2seq_model_wonezha_csl.%s.weights' % epoch)  # 保存模型
         optimizer.reset_old_weights()
 
 
 if __name__ == '__main__':
 
     # 加载数据
-    data = load_data(data_seq2seq_json)
-    train_data = data_split(data, fold, num_folds, 'train')
-    valid_data = data_split(data, fold, num_folds, 'valid')
-
+    # data = load_data(data_seq2seq_json)
+    # train_data = data_split(data, fold, num_folds, 'train')
+    # valid_data = data_split(data, fold, num_folds, 'valid')
+    # train_data = load_data("/home/transwarp/gujiasheng/csl_title_public/csl_title_train_seq2seq.json")
+    # train_valid = load_data("/home/transwarp/gujiasheng/csl_title_public/csl_title_dev_seq2seq.json")
+    txts = glob.glob('/home/transwarp/gujiasheng/data/THUCNews/*/*.txt')
+    train_data = txts[:int(0.999 * len(txts))]
+    valid_data = txts[int(0.999 * len(txts)):]
 
     # 启动训练
     evaluator = Evaluator()
@@ -329,5 +407,5 @@ if __name__ == '__main__':
 
 else:
 
-    model.load_weights('weights/best_model_csl.weights')
-    # model.load_weights('weights/seq2seq_model_wonezha_csl.%s.weights' % (epochs - 1))
+    # model.load_weights('weights/seq2seq_model_wonezha_THUC.%s.weights' % (epochs - 1))
+    model.load_weights('weights/THUC_best_model.weights')

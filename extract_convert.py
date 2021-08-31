@@ -48,7 +48,7 @@ def extract_flow(inputs):
     texts = text_split(text, True)  # 取后maxlen句
     summaries = text_split(summary, False)
     mapping = extract_matching(texts, summaries)
-    labels = sorted(set([i[1] for i in mapping]))
+    labels = sorted(set([int(i[1]) for i in mapping]))
     pred_summary = ''.join([texts[i] for i in labels])
     metric = compute_main_metric(pred_summary, summary)
     return texts, labels, summary, metric

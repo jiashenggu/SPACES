@@ -37,13 +37,16 @@ if __name__ == '__main__':
 
     from tqdm import tqdm
 
-    data = extract.load_data(extract.data_extract_json)
+    data = extract.load_data("/home/transwarp/gujiasheng/csl_title_public/csl_title_train_seq2seq.json")
+    # data = extract.load_data(extract.data_extract_json)
     valid_data = data_split(data, fold, num_folds, 'valid')
+    # valid_data = data
     total_metrics = {k: 0.0 for k in metric_keys}
     for d in tqdm(valid_data):
-        text = '\n'.join(d[0])
+        # text = '\n'.join(d[0])
+        text = d["source_1"]
         summary = predict(text)
-        metrics = compute_metrics(summary, d[2])
+        metrics = compute_metrics(summary, d['target'])
         for k, v in metrics.items():
             total_metrics[k] += v
 
