@@ -3,17 +3,7 @@
 
 博客介绍：https://kexue.fm/archives/8046
 
-## 含义
-
-我们将我们的模型称为SPACES，它正好是科学空间的域名之一（[https://spaces.ac.cn](https://spaces.ac.cn)），具体含义如下：
-- **S**：Sparse Softmax；
-- **P**：Pretrained Language Model；
-- **A**：Abstractive；
-- **C**：Copy Mechanism；
-- **E**：Extractive；
-- **S**：Special Words。
-
-顾名思义，这是一个以词为单位的、包含预训练和Copy机制的“抽取-生成”式摘要模型，里边包含了一些我们对文本生成技术的最新研究成果。
+test on csl， THUCNews
 
 ## 运行
 
@@ -44,13 +34,3 @@ summary = predict(text, topk=3)
 print(summary)
 ```
 
-## 交流
-
-QQ交流群：808623966，微信群请加机器人微信号spaces_ac_cn
-
-## 链接
-
-- 博客：https://kexue.fm
-- 追一：https://zhuiyi.ai/
-- 预训练模型：https://github.com/ZhuiyiTechnology/pretrained-models
-- WoBERT：https://github.com/ZhuiyiTechnology/WoBERT
